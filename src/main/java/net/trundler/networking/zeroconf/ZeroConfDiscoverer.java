@@ -25,6 +25,11 @@ public class ZeroConfDiscoverer {
 
     private static final int shutdownWait = 15; // secs
 
+    /**
+     * Write UPNP event data to file.
+     *
+     * @param event Zeroconf event
+     */
     private static void writeReportToFile(final ServiceEvent event) {
 
         final String key = event.getInfo().getKey();
@@ -40,6 +45,14 @@ public class ZeroConfDiscoverer {
         }
     }
 
+
+    /**
+     * Serialize UPNP device data to JSON.
+     *
+     * @param event Zeroconf event
+     * @param os    Output stream
+     * @throws IOException Problem during serialisation to JSON
+     */
     private static void serialize(final ServiceEvent event, final OutputStream os) throws IOException {
         try (JsonGenerator generator = factory.createGenerator(os).useDefaultPrettyPrinter()) {
 
