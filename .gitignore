@@ -14,3 +14,4 @@ target
 upnp_*.json
 zeroconf*.json
 workspace.xml
+logs

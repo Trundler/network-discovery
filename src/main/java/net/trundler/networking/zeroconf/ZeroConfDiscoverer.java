@@ -33,28 +33,50 @@ public class ZeroConfDiscoverer {
     private static void writeReportToFile(final ServiceEvent event) {
 
         final String key = event.getInfo().getKey();
-        logger.info("Write file for key: {}", key);
+        logger.debug("Write file for key: {}", key);
 
 
         try (OutputStream os = Files.newOutputStream(Paths.get("zeroconf_" + key + ".json"))) {
 
-            ZeroConfDiscoverer.serialize(event, os);
+            ZeroConfDiscoverer.serialize(event, os, true);
 
         } catch (final IOException ex) {
             logger.error(ex);
         }
     }
 
+    /**
+     * Write device data to stdout
+     *
+     * @param event Zeroconf event
+     */
+    private static void writeReportToSTDOUT(final ServiceEvent event) {
+
+        try {
+            ZeroConfDiscoverer.serialize(event, System.out, false);
+            System.out.print("\n");
+        } catch (IOException e) {
+            logger.error(e);
+        }
+
+    }
 
     /**
      * Serialize UPNP device data to JSON.
      *
-     * @param event Zeroconf event
-     * @param os    Output stream
+     * @param event          Zeroconf event
+     * @param os             Output stream
+     * @param usePrettyPrint Set to true to have the JSON indented.
      * @throws IOException Problem during serialisation to JSON
      */
-    private static void serialize(final ServiceEvent event, final OutputStream os) throws IOException {
-        try (JsonGenerator generator = factory.createGenerator(os).useDefaultPrettyPrinter()) {
+    private static void serialize(final ServiceEvent event, final OutputStream os, final boolean usePrettyPrint) throws IOException {
+
+        try (JsonGenerator generator = usePrettyPrint
+                ? factory.createGenerator(os).useDefaultPrettyPrinter()
+                : factory.createGenerator(os)) {
+
+            // Outputstream is closed on different level, so it can be (re)used for appending.
+            generator.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
 
             generator.writeStartObject();
             generator.writeStringField("name", event.getName());
@@ -105,6 +127,8 @@ public class ZeroConfDiscoverer {
 
     public static void main(final String[] args) throws InterruptedException {
         try {
+            logger.info("Start discovery");
+
             // Create a JmDNS instance
             final JmDNS jmdns = JmDNS.create(InetAddress.getLocalHost());
 
@@ -121,12 +145,12 @@ public class ZeroConfDiscoverer {
             logger.info("Waiting {} seconds...", shutdownWait);
             Thread.sleep(TimeUnit.SECONDS.toMillis(shutdownWait));
 
-
-            for (final ServiceEvent serviceEvent : serviceListener.getEvents()) {
-                ZeroConfDiscoverer.writeReportToFile(serviceEvent);
-            }
+            // Write result
+            logger.info("Writing {} events", serviceListener.getEvents().size());
+            serviceListener.getEvents().stream().forEach(ZeroConfDiscoverer::writeReportToSTDOUT);
 
             // Cleanup
+            logger.info("Cleaning up");
             jmdns.removeServiceTypeListener(stListener);
             jmdns.unregisterAllServices();
 

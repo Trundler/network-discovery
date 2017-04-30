@@ -43,7 +43,7 @@ public class UpnpDiscoverer {
 
         try (OutputStream os = Files.newOutputStream(Paths.get("upnp_" + udn.getIdentifierString() + ".json"))) {
 
-            UpnpDiscoverer.serialize(device, os);
+            UpnpDiscoverer.serialize(device, os, true);
 
         } catch (final IOException ex) {
             logger.error(ex);
@@ -51,14 +51,37 @@ public class UpnpDiscoverer {
     }
 
     /**
-     * Serialize UPNP device data to JSON.
+     * Write device data to stdout
      *
      * @param device UPnP device
-     * @param os     Output stream
+     */
+    private static void writeReportToSTDOUT(final Device device) {
+
+        try {
+            UpnpDiscoverer.serialize(device, System.out, false);
+            System.out.print("\n");
+        } catch (IOException e) {
+            logger.error(e);
+        }
+
+    }
+
+
+    /**
+     * Serialize UPNP device data to JSON.
+     *
+     * @param device         UPnP device
+     * @param os             Output stream
+     * @param usePrettyPrint Set to true to have the JSON indented.
      * @throws IOException Problem during serialisation to JSON
      */
-    private static void serialize(final Device device, final OutputStream os) throws IOException {
-        try (JsonGenerator generator = factory.createGenerator(os).useDefaultPrettyPrinter()) {
+    private static void serialize(final Device device, final OutputStream os, final boolean usePrettyPrint) throws IOException {
+        try (JsonGenerator generator = usePrettyPrint
+                ? factory.createGenerator(os).useDefaultPrettyPrinter()
+                : factory.createGenerator(os)) {
+
+            // Outputstream is closed on different level, so it can be (re)used for appending.
+            generator.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
 
             generator.writeStartObject();
             generator.writeStringField("id", device.getIdentity().getUdn().getIdentifierString());
@@ -83,9 +106,6 @@ public class UpnpDiscoverer {
                 generator.writeEndArray();
             }
 
-//            final Device[] embeddedDevices = device.;
-//            Arrays.stream(embeddedDevices).forEach(d -> logger.info("##{}",d.getDisplayString()));
-
         }
 
     }
@@ -106,9 +126,11 @@ public class UpnpDiscoverer {
         Thread.sleep(TimeUnit.SECONDS.toMillis(shutdownWait));
 
         // Report devices
-        upnpService.getRegistry().getDevices().forEach(UpnpDiscoverer::writeReportToFile);
+        logger.info("Discovered {} devices.", upnpService.getRegistry().getDevices().size());
+        upnpService.getRegistry().getDevices().forEach(UpnpDiscoverer::writeReportToSTDOUT);
 
         // Cleanup
+        logger.info("Cleaning up");
         upnpService.shutdown();
     }
 }
